@@ -11,6 +11,8 @@ from PIL import Image
 import tensorflow as tf
 import numpy as np
 import pickle
+from itertools import product
+
 
 CUT_TO_USE = 12
 
@@ -244,11 +246,15 @@ def preprocess_pk(mode, data_dir, temp_dir, patient_dir):
         :return:
         """
         temp = []
-        print(patient_data['tumor(20min)'].str.split(',').tolist())
-        tumor_cut = [[int(i) if i.isdigit() else 0 for i in x] for x in patient_data['tumor(20min)'].str.split(',').tolist()]
+        patient_id = patient[-7:]
+        patient_id = patient_data.loc[patient_data['patID'].map(int) == int(patient_id)]
+        if not len(patient_id['tumor(20min)']) == 0:
+            tumor_cut = [int(x) for x in patient_id['tumor(20min)'].str.split(',').tolist()[0]]
+        else:
+            return False
 
         for i, cut in enumerate(os.listdir(patient)):
-            if tumor_cut[i][0] <= i <= tumor_cut[i][1]:
+            if tumor_cut[0] <= i <= tumor_cut[1]:
                 img = Image.open(os.path.join(patient, cut)).convert('L')
                 img = np.array(img).reshape((96, 192, 1)) / 255 + 0.0001  # Preprocess
                 temp.append(img)
@@ -259,26 +265,41 @@ def preprocess_pk(mode, data_dir, temp_dir, patient_dir):
             temp = temp + [np.zeros(shape=(96, 192, 1)) + 0.0001 for _ in range(CUT_TO_USE - len(temp))]
         img_3d = np.concatenate(temp, axis=2)
 
-        label = np.array([label])
+        tableur = patient_id[['gender', 'age', 'cirrhosis', 'Tumor_size1']].values.tolist()[0]
+        label = patient_id[['peritumoral enhancement(arterial)',
+                            'rim-like enhancement(arterial)',
+                            'peritumoral hypointensity(20min)',
+                            'Irregular margin(20min)']].values.tolist()[0]
+        machine = patient_id[['Machine']].values.tolist()[0][0]
 
-        patient_id = patient[-7:]
-        patient_id = patient_data.loc[patient_data['patID'].map(int) == int(patient_id)]
-        tableur = patient_id[['gender', 'age', 'cirrhosis', 'Tumor_size1',
-                              'peritumoral enhancement(arterial)',
-                              'rim-like enhancement(arterial)',
-                              'peritumoral hypointensity(20min)',
-                              'Irregular margin(20min)']].values.tolist()[0]
         tableur[0] = 0.00001 if tableur[0] == 'M' else 0.99999
         tableur[1] = tableur[1] / 110 + 0.00001
         tableur[2] = tableur[2] + 0.00001 if tableur[2] == 0 else 0.99999
+        if tableur[3] <= 2 or not machine.startswith('A'):
+            return False
         tableur[3] = tableur[3] / 5
 
-        tableur[4] = 0.00001 if tableur[4] == '0' or tableur[4] == '0m' else 0.99999
-        tableur[5] = 0.00001 if tableur[5] == '0' or tableur[5] == '0m' else 0.99999
-        tableur[6] = 0.00001 if tableur[6] == '0' or tableur[6] == '0m' else 0.99999
-        tableur[7] = 0.00001 if tableur[7] == '0' or tableur[7] == '0m' else 0.99999
+        tumor_z_size = (tumor_cut[1] - tumor_cut[0])/len(os.listdir(patient))
+        tableur.append(tumor_z_size)
+
+        label[0] = 0 if label[0] == 0 or label[0] == '0m' or label[0] == 'x' or label[0] == '?' else 1
+        label[1] = 0 if label[1] == 0 or label[1] == '0m' or label[0] == 'x' or label[0] == '?' else 1
+        label[2] = 0 if label[2] == 0 or label[2] == '0m' or label[0] == 'x' or label[0] == '?'else 1
+        label[3] = 0 if label[3] == 0 or label[3] == '0m' or label[0] == 'x' or label[0] == '?' else 1
+        label = tuple(label)
+
+        def make_combination(ser, n=4):
+            items = [(0, 1) for _ in range(n)]
+            able = list(product(*items))
+            able = sorted(able,
+                          key=lambda x: x.count(1))
+            idx = able.index(ser)
+            return [1e-5 if x != idx else 1-1e-5 for x in range(2**n)]
+
+        label = make_combination(label)
 
         tableur = np.array(tableur, float)
+        label = np.array(label, float)
 
         return {'image': img_3d,
                 'tableur': tableur,
@@ -330,14 +351,17 @@ def preprocess_pk(mode, data_dir, temp_dir, patient_dir):
     elif mode == 'concat3d_wjl':
         temp = []
         labels = [0, 1]
-        patient_df = pd.read_excel(patient_dir, sheet_name='data')
+        patient_df = pd.read_excel(patient_dir, sheet_name='data').dropna()
         for label in labels:
             patient_list = os.listdir(os.path.join(data_dir, str(label)))
             for patient in patient_list:
-                ex = concat3d_wjl(os.path.join(data_dir, str(label), patient),
-                                  label,
-                                  patient_data=patient_df)
-                temp.append(ex)
+                if not patient.endswith('DS_Store'):
+                    ex = concat3d_wjl(os.path.join(data_dir, str(label), patient),
+                                      label,
+                                      patient_data=patient_df)
+                    if not ex:
+                        continue
+                    temp.append(ex)
         with open(os.path.join(temp_dir, temp_dir[10:] + '.bin'), 'wb') as pk:
             pickle.dump(temp, pk)
 

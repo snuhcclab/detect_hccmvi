@@ -39,14 +39,12 @@ def trainer(experiment, result_dir):
         optimizer=getattr(optimizers, experiment.optimizer)(learning_rate=experiment.learning_rate,
                                                             clipnorm=1.0),
         loss=experiment.loss,
-        metrics=[BinaryAccuracy(), 'accuracy'])
-    print(next(iter(experiment.train_data)))
+        metrics=['categorical_accuracy'])
 
     history = experiment.model.fit(experiment.train_data,
                                    validation_data=experiment.val_data,
                                    epochs=experiment.epoch,
                                    callbacks=callbacks)
-
     save_model(experiment.model, os.path.join(result_dir, 'model'))
 
     return experiment.model, history
@@ -61,7 +59,7 @@ def plotter(experiment, hist, result_dir):
     """
     # Estimate Model
     #
-    evaluation = experiment.model.evaluate(experiment.test_data)
+    # evaluation = experiment.model.evaluate(experiment.test_data)
 
     # test_x = concatenate([x['image'] if isinstance(x, dict) else x for x, y in experiment.test_data], axis=0)
     test_y = concatenate([y for x, y in experiment.test_data], axis=0)

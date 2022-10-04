@@ -14,7 +14,7 @@ def main(raw_dir, result_dir):
     #   Build Models
     #
     experiment_list = [
-        experiments.CONRES3DMM
+        experiments.Res3DMMPAD_WJL
     ]
 
     #
@@ -40,7 +40,6 @@ def main(raw_dir, result_dir):
             experiment=experiment,
             result_dir=os.path.join(result_dir, experiment.name)
         )
-        pdb.set_trace()
         #
         #   Plot Model
         #

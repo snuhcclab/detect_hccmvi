@@ -314,13 +314,12 @@ def resnet50_fine_tuning_multichannel_multimodal(input_shape, tune=48):
 
 def resnet50_fine_tuning_multichannel_multimodal_wjl_concat(input_shape, tune=128):
     augmentation_preprocessing = Sequential(
-        [RandomFlip('horizontal'), RandomRotation(0.2), Rescaling(1. / 127.5, offset=-1)])
+        [RandomFlip('horizontal'), RandomRotation(0.2), Rescaling(1. / 127.5, offset=-1),
+         Resizing(112, 224)])
 
-    compress_layer_1 = Conv2D(12, kernel_size=1, strides=1)
-    compress_layer_2 = Conv2D(6, kernel_size=1, strides=1)
-    compress_layer_3 = Conv2D(3, kernel_size=1, strides=1)
+    compress_layer = Conv2D(3, kernel_size=1, strides=1)
 
-    base_model = ResNet50(input_shape=(*input_shape[:2], 3),
+    base_model = ResNet50(input_shape=(112, 224, 3),
                           include_top=False,
                           weights='imagenet')
 
@@ -330,25 +329,22 @@ def resnet50_fine_tuning_multichannel_multimodal_wjl_concat(input_shape, tune=12
 
     ga_layer = GlobalAvgPool2D()
 
-    prediction_layer = Dense(1)
+    prediction_layer = Dense(16, activation='sigmoid')
 
     inputs_ = Input(shape=input_shape)
-    sub_inputs_ = Input(shape=(8, ))
+    sub_inputs_ = Input(shape=(5, ))
 
     x = augmentation_preprocessing(inputs_)
-    x = compress_layer_1(x)
-    x = compress_layer_2(x)
-    x = compress_layer_3(x)
+
+    x = compress_layer(x)
+
     x = base_model(x)
 
-    x_s = Dense(16)(sub_inputs_)
-    x_s = Dense(8)(x_s)
+    x_s = Dense(8)(sub_inputs_)
 
     x = ga_layer(x)
 
     x = concatenate([x, x_s])
-
-    x = Dense(8)(x)
 
     x = Dropout(0.2)(x)
 
