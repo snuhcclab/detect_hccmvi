@@ -329,7 +329,7 @@ def resnet50_fine_tuning_multichannel_multimodal_wjl_concat(input_shape, tune=12
 
     ga_layer = GlobalAvgPool2D()
 
-    prediction_layer = Dense(16, activation='sigmoid')
+    prediction_layer = Dense(4, activation='sigmoid')
 
     inputs_ = Input(shape=input_shape)
     sub_inputs_ = Input(shape=(5, ))

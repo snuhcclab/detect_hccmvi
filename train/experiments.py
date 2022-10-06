@@ -59,7 +59,7 @@ def decode_to_generator(dataset_name, scheme='original'):
 def read_dataset(dataset_name: str, batch_size=8, dataset_size=HBP3D_SIZE,
                  frac: tuple = (0.6, 0.2, 0.2), multimodal: bool = False, concat: bool = False):
     if concat:
-        output_shape = ({'image': (96, 192, 12), 'tableur': (5)}, (16))
+        output_shape = ({'image': (96, 192, 12), 'tableur': (5)}, (4))
     elif multimodal:
         output_shape = ({'image': (96, 96, 12), 'tableur': (5)}, 1)
     else:

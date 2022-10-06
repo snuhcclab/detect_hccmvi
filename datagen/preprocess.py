@@ -286,7 +286,7 @@ def preprocess_pk(mode, data_dir, temp_dir, patient_dir):
         label[1] = 0 if label[1] == 0 or label[1] == '0m' or label[0] == 'x' or label[0] == '?' else 1
         label[2] = 0 if label[2] == 0 or label[2] == '0m' or label[0] == 'x' or label[0] == '?'else 1
         label[3] = 0 if label[3] == 0 or label[3] == '0m' or label[0] == 'x' or label[0] == '?' else 1
-        label = tuple(label)
+        label = tuple(label[2:])
 
         def make_combination(ser, n=4):
             items = [(0, 1) for _ in range(n)]
@@ -296,7 +296,7 @@ def preprocess_pk(mode, data_dir, temp_dir, patient_dir):
             idx = able.index(ser)
             return [1e-5 if x != idx else 1-1e-5 for x in range(2**n)]
 
-        label = make_combination(label)
+        label = make_combination(label, n=2)
 
         tableur = np.array(tableur, float)
         label = np.array(label, float)
